@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Credential Update Form</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <div class="container">
+        <h2>UiPath Assets Credentials Update Form</h2>
+        <form id="credentialForm" action="/submit" method="POST">
+            <label for="employeeId">Employee ID</label>
+            <input type="text" id="employeeId" name="employeeId" required />
+
+            <label for="asset">Select Asset</label>
+            <select id="asset" name="asset" required>
+                <option value="">-- Choose an Asset --</option>
+                <option value="User Credential Asset 1">User Credential Asset 1</option>
+                <option value="User Credential Asset 2">User Credential Asset 2</option>
+                <option value="User Credential Asset 3">User Credential Asset 3</option>
+                <option value="User Credential Asset 4">User Credential Asset 4</option>
+            </select>
+
+            <label for="username">Username (Email ID)</label>
+            <input type="email" id="username" name="username" required />
+
+            <label for="newPassword">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" required />
+
+            <div class="button-group">
+                <button type="submit">Submit</button>
+                <button type="reset">Reset</button>
+            </div>
+        </form>
+    </div>
+    <div id="alertBox" style="display: none;"></div>
+
+
+    <!-- SCRIPT for validation -->
+    <script>
+        const form = document.getElementById("credentialForm");
+        const alertBox = document.getElementById("alertBox");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault(); // prevent default reload
+
+            const employeeId = form.employeeId.value.trim();
+            const asset = form.asset.value;
+            const username = form.username.value.trim();
+            const newPassword = form.newPassword.value.trim();
+
+            if (!employeeId || !asset || !username || !newPassword) {
+                showAlert("❌ All fields are required.", "tomato");
+                return;
+            }
+
+            try {
+                const response = await fetch("/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ employeeId, asset, username, newPassword }),
+                });
+
+                const result = await response.text(); // Server returns HTML (currently)
+                if (response.ok) {
+                    showAlert("✅ Credentials successfully added to the queue!", "palegreen");
+                    form.reset();
+                } else {
+                    showAlert("❌ Failed: " + result, "tomato");
+                }
+            } catch (err) {
+                showAlert("❌ Server error: " + err.message, "tomato");
+            }
+        });
+
+        function showAlert(message, color) {
+            alertBox.textContent = message;
+            alertBox.style.background = color;
+            alertBox.style.padding = "10px";
+            alertBox.style.borderRadius = "8px";
+            alertBox.style.display = "block";
+            alertBox.style.opacity = "1";
+            alertBox.style.transform = "translateY(-20px)";
+            alertBox.style.scale = "1.05";
+            setTimeout(() => {
+                alertBox.style.display = "none";
+                alertBox.style.opacity = "0";
+                alertBox.style.transform = "translateY(-10px)";
+                alertBox.style.scale = "1";
+            }, 3000)
+        }
+    </script>
+</body>
+
+</html>
