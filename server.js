@@ -53,6 +53,77 @@ app.get("/assets", async (req, res) => {
   }
 });
 
+app.post("/submit", async (req, res) => {
+  const { asset, username, newPassword } = req.body;
+
+  if (!asset || !username || !newPassword) {
+    return res.status(400).send("Missing fields");
+  }
+
+  try {
+    // Step 1: Get Token
+    const tokenResponse = await axios.post(
+      "https://cloud.uipath.com/identity_/connect/token",
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: "aa38df26-cc6c-4e12-b2f8-4eed9c7574f0",
+        client_secret: "vlF_BIfY0VCCBDzM",
+        scope: "OR.Assets.Write OR.Folders.Read",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // Step 2: Get all assets to find selected asset's ID
+    const assetsResponse = await axios.get(
+      "https://cloud.uipath.com/faizanorg/DefaultTenant/odata/Assets",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-UIPATH-OrganizationUnitId": "98475",
+        },
+      }
+    );
+
+    const selectedAsset = assetsResponse.data.value.find(
+      (a) => a.Name === asset && a.Type === "Credential"
+    );
+
+    if (!selectedAsset) {
+      return res.status(404).send("Asset not found or not a Credential type");
+    }
+
+    // Step 3: Update the asset
+    await axios.put(
+      `https://cloud.uipath.com/faizanorg/DefaultTenant/odata/Assets(${selectedAsset.Id})`,
+      {
+        Name: selectedAsset.Name,
+        ValueScope: selectedAsset.ValueScope || "PerRobot",
+        CredentialUsername: username,
+        CredentialPassword: newPassword,
+        Description: "Updated via web form",
+        Type: "Credential",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-UIPATH-OrganizationUnitId": "98475",
+        },
+      }
+    );
+
+    res.send("✅ Asset updated successfully");
+  } catch (err) {
+    console.error(
+      "❌ Error updating asset:",
+      err.response?.data || err.message
+    );
+    res.status(500).send("Server error while updating asset");
+  }
+});
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
