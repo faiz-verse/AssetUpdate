@@ -22,8 +22,9 @@ app.get("/assets", async (req, res) => {
       "https://cloud.uipath.com/identity_/connect/token",
       new URLSearchParams({
         grant_type: "client_credentials",
-        client_id: "aa38df26-cc6c-4e12-b2f8-4eed9c7574f0",
-        client_secret: "vlF_BIfY0VCCBDzM",
+        client_id: "18466bdc-9274-46aa-b6f9-66e281ab4b83",
+        client_secret:
+          "OS?p!nHpoIuZsd!%tm@RDv~7X!uev0(BkleCoWNHL6gLa94I)k7OYt@nv?REo96M",
         scope: "OR.Assets.Read OR.Folders.Read",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
@@ -66,8 +67,9 @@ app.post("/submit", async (req, res) => {
       "https://cloud.uipath.com/identity_/connect/token",
       new URLSearchParams({
         grant_type: "client_credentials",
-        client_id: "aa38df26-cc6c-4e12-b2f8-4eed9c7574f0",
-        client_secret: "vlF_BIfY0VCCBDzM",
+        client_id: "18466bdc-9274-46aa-b6f9-66e281ab4b83",
+        client_secret:
+          "OS?p!nHpoIuZsd!%tm@RDv~7X!uev0(BkleCoWNHL6gLa94I)k7OYt@nv?REo96M",
         scope: "OR.Assets.Write OR.Folders.Read",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
