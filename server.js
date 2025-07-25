@@ -62,7 +62,6 @@ app.post("/submit", async (req, res) => {
   }
 
   try {
-    // Step 1: Get Token
     const tokenResponse = await axios.post(
       "https://cloud.uipath.com/identity_/connect/token",
       new URLSearchParams({
@@ -70,14 +69,17 @@ app.post("/submit", async (req, res) => {
         client_id: "18466bdc-9274-46aa-b6f9-66e281ab4b83",
         client_secret:
           "OS?p!nHpoIuZsd!%tm@RDv~7X!uev0(BkleCoWNHL6gLa94I)k7OYt@nv?REo96M",
-        scope: "OR.Assets.Write OR.Folders.Read",
+        scope: "OR.Assets.Read OR.Assets.Write OR.Folders.Read",
       }),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
     );
 
     const accessToken = tokenResponse.data.access_token;
 
-    // Step 2: Get all assets to find selected asset's ID
     const assetsResponse = await axios.get(
       "https://cloud.uipath.com/faizanorg/DefaultTenant/odata/Assets",
       {
@@ -96,7 +98,6 @@ app.post("/submit", async (req, res) => {
       return res.status(404).send("Asset not found or not a Credential type");
     }
 
-    // Step 3: Update the asset
     await axios.put(
       `https://cloud.uipath.com/faizanorg/DefaultTenant/odata/Assets(${selectedAsset.Id})`,
       {
@@ -104,7 +105,7 @@ app.post("/submit", async (req, res) => {
         ValueScope: selectedAsset.ValueScope || "PerRobot",
         CredentialUsername: username,
         CredentialPassword: newPassword,
-        Description: "Updated via web form",
+        Description: selectedAsset.Description || "Updated via web form",
         Type: "Credential",
       },
       {
@@ -115,6 +116,10 @@ app.post("/submit", async (req, res) => {
         },
       }
     );
+
+    console.log("Selected Asset ID:", selectedAsset.Id);
+    console.log("Updating with Username:", username);
+    console.log("Token used:", accessToken.substring(0, 20) + "...");
 
     res.send("✅ Asset updated successfully");
   } catch (err) {
