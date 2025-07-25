@@ -10,7 +10,7 @@
 
 <body>
     <div class="container">
-        <h2>UiPath Assets Credentials Update Form</h2>
+        <h2>Assets Update Form</h2>
 
         <button id="fetchAssetsBtn">🔄 Fetch Available Assets</button>
 
@@ -114,6 +114,12 @@
                 assetDropdown.innerHTML = '<option value="">-- Load failed --</option>';
             }
         }
+
+        document.getElementById("fetchAssetsBtn").addEventListener("click", () => {
+            loadAssets();
+            form.style.display = "block"; // <-- make the form visible
+        });
+
 
     </script>
 </body>
