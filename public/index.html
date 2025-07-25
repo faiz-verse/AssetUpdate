@@ -4,25 +4,25 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Credential Update Form</title>
+    <title>Asset Update Form</title>
     <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
     <div class="container">
         <h2>UiPath Assets Credentials Update Form</h2>
-        <form id="credentialForm" action="/submit" method="POST">
-            <label for="employeeId">Employee ID</label>
-            <input type="text" id="employeeId" name="employeeId" required />
+
+        <button id="fetchAssetsBtn">🔄 Fetch Available Assets</button>
+
+        <form id="credentialForm" style="display:none;" action="/submit" method="POST">
 
             <label for="asset">Select Asset</label>
-            <select id="asset" name="asset" required>
-                <option value="">-- Choose an Asset --</option>
-                <option value="User Credential Asset 1">User Credential Asset 1</option>
-                <option value="User Credential Asset 2">User Credential Asset 2</option>
-                <option value="User Credential Asset 3">User Credential Asset 3</option>
-                <option value="User Credential Asset 4">User Credential Asset 4</option>
-            </select>
+            <div style="display: flex; gap: 10px;">
+                <select id="asset" name="asset" required>
+                    <option value="">-- Click 'Load Assets' --</option>
+                </select>
+                <button type="button" onclick="loadAssets()">🔄 Load Assets</button>
+            </div>
 
             <label for="username">Username (Email ID)</label>
             <input type="email" id="username" name="username" required />
@@ -31,28 +31,26 @@
             <input type="password" id="newPassword" name="newPassword" required />
 
             <div class="button-group">
-                <button type="submit">Submit</button>
+                <button type="submit">Update</button>
                 <button type="reset">Reset</button>
             </div>
         </form>
     </div>
     <div id="alertBox" style="display: none;"></div>
 
-
-    <!-- SCRIPT for validation -->
     <script>
         const form = document.getElementById("credentialForm");
+        const assetDropdown = document.getElementById("asset");
         const alertBox = document.getElementById("alertBox");
 
         form.addEventListener("submit", async (e) => {
-            e.preventDefault(); // prevent default reload
+            e.preventDefault();
 
-            const employeeId = form.employeeId.value.trim();
             const asset = form.asset.value;
             const username = form.username.value.trim();
             const newPassword = form.newPassword.value.trim();
 
-            if (!employeeId || !asset || !username || !newPassword) {
+            if (!asset || !username || !newPassword) {
                 showAlert("❌ All fields are required.", "tomato");
                 return;
             }
@@ -61,12 +59,12 @@
                 const response = await fetch("/submit", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ employeeId, asset, username, newPassword }),
+                    body: JSON.stringify({ asset, username, newPassword }),
                 });
 
-                const result = await response.text(); // Server returns HTML (currently)
+                const result = await response.text();
                 if (response.ok) {
-                    showAlert("✅ Credentials successfully added to the queue!", "palegreen");
+                    showAlert(result, "palegreen");
                     form.reset();
                 } else {
                     showAlert("❌ Failed: " + result, "tomato");
@@ -75,6 +73,7 @@
                 showAlert("❌ Server error: " + err.message, "tomato");
             }
         });
+
 
         function showAlert(message, color) {
             alertBox.textContent = message;
@@ -90,8 +89,32 @@
                 alertBox.style.opacity = "0";
                 alertBox.style.transform = "translateY(-10px)";
                 alertBox.style.scale = "1";
-            }, 3000)
+            }, 3000);
         }
+
+        async function loadAssets() {
+            const assetDropdown = document.getElementById("asset");
+            assetDropdown.innerHTML = '<option value="">Loading...</option>';
+
+            try {
+                const response = await fetch("/assets");
+                const assets = await response.json();
+
+                assetDropdown.innerHTML = '<option value="">-- Choose an Asset --</option>';
+                assets.forEach((asset) => {
+                    const option = document.createElement("option");
+                    option.value = asset;
+                    option.textContent = asset;
+                    assetDropdown.appendChild(option);
+                });
+                showAlert("✅ Assets loaded successfully!", "palegreen");
+            } catch (err) {
+                console.error("Error loading assets:", err);
+                showAlert("❌ Failed to load assets", "tomato");
+                assetDropdown.innerHTML = '<option value="">-- Load failed --</option>';
+            }
+        }
+
     </script>
 </body>
 
