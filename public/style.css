@@ -12,7 +12,8 @@ body {
     justify-content: center;
 }
 
-.container {
+.container,
+.container2 {
     background-color: #fff;
     max-width: 500px;
     margin: 70px auto;
@@ -79,6 +80,8 @@ button[type="reset"]:hover {
 #alertBox {
     max-width: 500px;
     margin: 20px auto;
+    padding: 10px;
+    border-radius: 10px;
     position: fixed;
     top: 40px;
     transition: all 1s ease-in-out;
