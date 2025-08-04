@@ -74,6 +74,7 @@ async function getBucketKey(bucketName, accessToken) {
 // Existing assets endpoint remains untouched
 app.get("/assets", async (req, res) => {
   try {
+    // 1. Get Access Token
     const tokenResponse = await axios.post(
       `${ORCH_BASE.replace(/\/+$/, "")}/identity_/connect/token`,
       new URLSearchParams({
@@ -85,8 +86,13 @@ app.get("/assets", async (req, res) => {
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
 
+    console.log("Token response data:", tokenResponse.data);
     const accessToken = tokenResponse.data.access_token;
+    if (!accessToken) {
+      return res.status(500).json({ error: "Did not receive access token" });
+    }
 
+    // 2. Get Assets
     const assetsResponse = await axios.get(`${ORCH_BASE}/odata/Assets`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -97,11 +103,15 @@ app.get("/assets", async (req, res) => {
     const assetNames = assetsResponse.data.value.map((asset) => asset.Name);
     res.json(assetNames);
   } catch (err) {
-    console.error(
-      "❌ Failed to fetch assets",
-      err.response?.data || err.message
-    );
-    res.status(500).json({ error: "Failed to fetch assets" });
+    console.error("❌ Failed to fetch assets", {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+    });
+    res.status(500).json({
+      error: "Failed to fetch assets",
+      details: err.response?.data || err.message,
+    });
   }
 });
 
