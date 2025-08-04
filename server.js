@@ -1,30 +1,85 @@
+require("dotenv").config(); // optional, if you're using a .env file
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
-const crypto = require("crypto");
-
+const multer = require("multer");
 const path = require("path");
 
+const upload = multer({ storage: multer.memoryStorage() });
 const app = express();
+
 const PORT = process.env.PORT || 3000;
+const ORCH_BASE =
+  process.env.UIPATH_ORCH_BASE ||
+  "https://cloud.uipath.com/faizanorg/DefaultTenant";
+const TENANT_FOLDER_ID = process.env.UIPATH_FOLDER_ID || "98475";
+const CLIENT_ID = process.env.CLIENT_ID || process.env.UIPATH_CLIENT_ID;
+const CLIENT_SECRET =
+  process.env.CLIENT_SECRET || process.env.UIPATH_CLIENT_SECRET;
+const SCOPES = "OR.StorageBuckets.Write OR.StorageBuckets.Read OR.Folders.Read";
+
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.warn("WARNING: CLIENT_ID or CLIENT_SECRET not set in env.");
+}
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
-// Serve static frontend
 app.use(express.static(path.join(__dirname, "public")));
 
+// Simple token cache
+let cachedToken = null;
+let tokenExpiry = 0;
+
+async function getAccessToken() {
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiry - 5000) {
+    return cachedToken;
+  }
+
+  const tokenUrl = `${ORCH_BASE.replace(/\/+$/, "")}/identity_/connect/token`;
+  const resp = await axios.post(
+    tokenUrl,
+    new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      scope: SCOPES,
+    }),
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+
+  const data = resp.data;
+  cachedToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+  return cachedToken;
+}
+
+async function getBucketKey(bucketName, accessToken) {
+  const filter = `$filter=Name eq '${bucketName.replace(/'/g, "''")}'`;
+  const url = `${ORCH_BASE}/odata/Buckets?${filter}`;
+  const resp = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
+    },
+  });
+  const buckets = resp.data.value;
+  if (!buckets || buckets.length === 0) {
+    throw new Error(`Storage bucket '${bucketName}' not found`);
+  }
+  return buckets[0].Key;
+}
+
+// Existing assets endpoint remains untouched
 app.get("/assets", async (req, res) => {
   try {
-    // 1. Get Access Token
     const tokenResponse = await axios.post(
-      "https://cloud.uipath.com/identity_/connect/token",
+      `${ORCH_BASE.replace(/\/+$/, "")}/identity_/connect/token`,
       new URLSearchParams({
         grant_type: "client_credentials",
-        client_id: "18466bdc-9274-46aa-b6f9-66e281ab4b83",
-        client_secret:
-          "OS?p!nHpoIuZsd!%tm@RDv~7X!uev0(BkleCoWNHL6gLa94I)k7OYt@nv?REo96M",
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
         scope: "OR.Assets.Read OR.Folders.Read",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
@@ -32,16 +87,12 @@ app.get("/assets", async (req, res) => {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // 2. Get Assets
-    const assetsResponse = await axios.get(
-      "https://cloud.uipath.com/faizanorg/DefaultTenant/odata/Assets",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "X-UIPATH-OrganizationUnitId": "98475",
-        },
-      }
-    );
+    const assetsResponse = await axios.get(`${ORCH_BASE}/odata/Assets`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
+      },
+    });
 
     const assetNames = assetsResponse.data.value.map((asset) => asset.Name);
     res.json(assetNames);
@@ -54,9 +105,89 @@ app.get("/assets", async (req, res) => {
   }
 });
 
-app.post("/submit", async (req, res) => {});
+// Upload-to-bucket route (no query in path; bucket passed as ?bucket=)
+app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
+  const bucketName = req.query.bucket;
+  if (!bucketName) {
+    return res.status(400).json({ error: "Missing ?bucket= parameter" });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
 
-// Start Server
+  try {
+    const accessToken = await getAccessToken();
+
+    // 1. Resolve bucket key from name
+    const bucketKey = await getBucketKey(bucketName, accessToken);
+
+    // 2. Get write URI for the file
+    const fileName = req.file.originalname;
+    const contentType = req.file.mimetype || "application/octet-stream";
+
+    const writeUriResp = await axios.get(
+      `${ORCH_BASE}/odata/Buckets(${bucketKey})/UiPath.Server.Configuration.OData.GetWriteUri`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
+        },
+        params: {
+          path: fileName,
+          contentType,
+        },
+      }
+    );
+
+    const { Uri: writeUri, Method } = writeUriResp.data;
+    if (!writeUri || !Method) throw new Error("Invalid write URI response");
+
+    // 3. Upload binary to the write URI
+    await axios.request({
+      url: writeUri,
+      method: Method,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": req.file.buffer.length,
+      },
+      data: req.file.buffer,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    });
+
+    // 4. Get read URI (to allow download/reference)
+    const readUriResp = await axios.get(
+      `${ORCH_BASE}/odata/Buckets(${bucketKey})/UiPath.Server.Configuration.OData.GetReadUri`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
+        },
+        params: {
+          path: fileName,
+          expiryInMinutes: 60, // adjust as needed
+        },
+      }
+    );
+
+    const { Uri: readUri } = readUriResp.data;
+    if (!readUri) throw new Error("Invalid read URI response");
+
+    res.json({
+      message: `File '${fileName}' uploaded to bucket '${bucketName}'`,
+      downloadUrl: readUri,
+    });
+  } catch (err) {
+    console.error("❌ Upload failed", err.response?.data || err.message);
+    const details =
+      err.response?.data?.error?.message ||
+      err.response?.data ||
+      err.message ||
+      "Unknown error";
+    res.status(500).json({ error: "Upload failed", details });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
