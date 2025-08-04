@@ -1,4 +1,4 @@
-require("dotenv").config(); // optional, if you're using a .env file
+// require("dotenv").config(); // optional, if you're using a .env file
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
