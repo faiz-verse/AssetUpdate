@@ -76,7 +76,7 @@ app.get("/assets", async (req, res) => {
   try {
     // 1. Get Access Token
     const tokenResponse = await axios.post(
-      `${ORCH_BASE.replace(/\/+$/, "")}/identity_/connect/token`,
+      "https://cloud.uipath.com/identity_/connect/token",
       new URLSearchParams({
         grant_type: "client_credentials",
         client_id: CLIENT_ID,
