@@ -28,6 +28,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+// Get Access Token
 // Simple token cache
 // let cachedToken = null;
 // let tokenExpiry = 0;
@@ -72,7 +73,7 @@ async function getBucketKey(bucketName, accessToken) {
   return buckets[0].Key;
 }
 
-// Existing assets endpoint remains untouched
+// Getting asset names for the dropdown
 app.get("/assets", async (req, res) => {
   try {
     // 1. Get Access Token
@@ -82,7 +83,7 @@ app.get("/assets", async (req, res) => {
         grant_type: "client_credentials",
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
-        scope: "OR.Assets.Read OR.Folders.Read",
+        scope: SCOPES,
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
@@ -145,8 +146,9 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
       return res.status(500).json({ error: "Did not receive access token" });
     }
 
-    // 1. Resolve bucket key from name
+    // Resolve bucket key from name
     const bucketKey = await getBucketKey(bucketName, accessToken);
+    console.log("Got the bucket key: ", bucketKey);
 
     // 2. Get signed PUT URI for the file
     const fileName = req.file.originalname;
@@ -170,9 +172,8 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     if (!writeUri || !Verb) throw new Error("Invalid write URI response");
 
     // 3. Upload binary to the write URI
-    await axios.request({
+    await axios.put({
       url: writeUri,
-      method: Verb,
       headers: {
         "x-ms-blob-type": "BlockBlob", // ✅ Required by Azure Blob
         "Content-Type": contentType,
@@ -184,22 +185,22 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     });
 
     // 4. (Optional) Get read URI for download
-    const readUriResp = await axios.get(
-      `${ORCH_BASE}/odata/Buckets(${bucketKey})/UiPath.Server.Configuration.OData.GetReadUri`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
-        },
-        params: {
-          path: fileName,
-          expiryInMinutes: 60,
-        },
-      }
-    );
+    // const readUriResp = await axios.get(
+    //   `${ORCH_BASE}/odata/Buckets(${bucketKey})/UiPath.Server.Configuration.OData.GetReadUri`,
+    //   {
+    //     headers: {
+    //       Authorization: `Bearer ${accessToken}`,
+    //       "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
+    //     },
+    //     params: {
+    //       path: fileName,
+    //       expiryInMinutes: 60,
+    //     },
+    //   }
+    // );
 
-    const { Uri: readUri } = readUriResp.data;
-    if (!readUri) throw new Error("Invalid read URI response");
+    // const { Uri: readUri } = readUriResp.data;
+    // if (!readUri) throw new Error("Invalid read URI response");
 
     res.json({
       message: `✅ File '${fileName}' uploaded to bucket '${bucketName}' successfully.`,
