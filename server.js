@@ -29,32 +29,32 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // Simple token cache
-let cachedToken = null;
-let tokenExpiry = 0;
+// let cachedToken = null;
+// let tokenExpiry = 0;
 
-async function getAccessToken() {
-  const now = Date.now();
-  if (cachedToken && now < tokenExpiry - 5000) {
-    return cachedToken;
-  }
+// async function getAccessToken() {
+//   const now = Date.now();
+//   if (cachedToken && now < tokenExpiry - 5000) {
+//     return cachedToken;
+//   }
 
-  const tokenUrl = `${ORCH_BASE.replace(/\/+$/, "")}/identity_/connect/token`;
-  const resp = await axios.post(
-    tokenUrl,
-    new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      scope: SCOPES,
-    }),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
+//   const tokenUrl = `${ORCH_BASE.replace(/\/+$/, "")}/identity_/connect/token`;
+//   const resp = await axios.post(
+//     tokenUrl,
+//     new URLSearchParams({
+//       grant_type: "client_credentials",
+//       client_id: CLIENT_ID,
+//       client_secret: CLIENT_SECRET,
+//       scope: SCOPES,
+//     }),
+//     { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+//   );
 
-  const data = resp.data;
-  cachedToken = data.access_token;
-  tokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
-  return cachedToken;
-}
+//   const data = resp.data;
+//   cachedToken = data.access_token;
+//   tokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+//   return cachedToken;
+// }
 
 async function getBucketKey(bucketName, accessToken) {
   const filter = `$filter=Name eq '${bucketName.replace(/'/g, "''")}'`;
@@ -127,8 +127,23 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
   }
 
   try {
-    const accessToken = await getAccessToken();
-    console.log("✅ Got token for upload:", accessToken);
+    // 1. Get Access Token
+    const tokenResponse = await axios.post(
+      "https://cloud.uipath.com/identity_/connect/token",
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        scope: SCOPES,
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    console.log("Token response data:", tokenResponse.data);
+    const accessToken = tokenResponse.data.access_token;
+    if (!accessToken) {
+      return res.status(500).json({ error: "Did not receive access token" });
+    }
 
     // 1. Resolve bucket key from name
     const bucketKey = await getBucketKey(bucketName, accessToken);
