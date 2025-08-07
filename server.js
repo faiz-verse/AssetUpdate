@@ -128,6 +128,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
 
   try {
     const accessToken = await getAccessToken();
+    console.log("✅ Got token for upload:", accessToken);
 
     // 1. Resolve bucket key from name
     const bucketKey = await getBucketKey(bucketName, accessToken);
