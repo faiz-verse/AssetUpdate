@@ -154,16 +154,23 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     const fileName = req.file.originalname;
     const contentType = req.file.mimetype || "application/octet-stream";
 
+    console.log("Getting the upload URI");
+    console.log(
+      "Calling write URI for:",
+      fileName,
+      "with content-type:",
+      contentType
+    );
+
     const writeUriResp = await axios.get(
-      `${ORCH_BASE}/odata/Buckets(2425)/UiPath.Server.Configuration.OData.GetWriteUri?path=${fileName}`,
+      `${ORCH_BASE}/odata/Buckets(2425)/UiPath.Server.Configuration.OData.GetWriteUri?path=${encodeURIComponent(
+        fileName
+      )}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "X-UIPATH-OrganizationUnitId": TENANT_FOLDER_ID,
-        },
-        params: {
-          path: fileName,
-          contentType,
+          "Content-Type": contentType,
         },
       }
     );
@@ -171,6 +178,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     const { Uri: writeUri, Verb } = writeUriResp.data;
     if (!writeUri || !Verb) throw new Error("Invalid write URI response");
 
+    console.log("Uplaoding file to the write URI");
     // 3. Upload binary to the write URI
     await axios.put({
       url: writeUri,
