@@ -180,10 +180,11 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
 
     console.log("Uplaoding file to the write URI");
     // 3. Upload binary to the write URI
-    await axios.put({
+    await axios.request({
       url: writeUri,
+      method: Verb, // usually "PUT"
       headers: {
-        "x-ms-blob-type": "BlockBlob", // ✅ Required by Azure Blob
+        "x-ms-blob-type": "BlockBlob",
         "Content-Type": contentType,
         "Content-Length": req.file.buffer.length,
       },
@@ -212,7 +213,6 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
 
     res.json({
       message: `✅ File '${fileName}' uploaded to bucket '${bucketName}' successfully.`,
-      downloadUrl: readUri,
     });
   } catch (err) {
     console.error("❌ Upload failed", err.response?.data || err.message);
