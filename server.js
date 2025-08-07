@@ -155,7 +155,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     const contentType = req.file.mimetype || "application/octet-stream";
 
     const writeUriResp = await axios.get(
-      `${ORCH_BASE}/odata/Buckets(2425)/UiPath.Server.Configuration.OData.GetWriteUri`,
+      `${ORCH_BASE}/odata/Buckets(2425)/UiPath.Server.Configuration.OData.GetWriteUri?path=${fileName}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
