@@ -16,7 +16,8 @@ const TENANT_FOLDER_ID = process.env.UIPATH_FOLDER_ID || "98475";
 const CLIENT_ID = process.env.CLIENT_ID || process.env.UIPATH_CLIENT_ID;
 const CLIENT_SECRET =
   process.env.CLIENT_SECRET || process.env.UIPATH_CLIENT_SECRET;
-const SCOPES = "OR.StorageBuckets.Write OR.StorageBuckets.Read OR.Folders.Read";
+const SCOPES =
+  "OR.Administration OR.Administration.Read OR.Administration.Write OR.Assets OR.Assets.Read OR.Assets.Write OR.Folders OR.Folders.Read OR.Folders.Write OR.Queues OR.Queues.Read OR.Queues.Write";
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.warn("WARNING: CLIENT_ID or CLIENT_SECRET not set in env.");
@@ -131,7 +132,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     // 1. Resolve bucket key from name
     const bucketKey = await getBucketKey(bucketName, accessToken);
 
-    // 2. Get write URI for the file
+    // 2. Get signed PUT URI for the file
     const fileName = req.file.originalname;
     const contentType = req.file.mimetype || "application/octet-stream";
 
@@ -149,14 +150,15 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
       }
     );
 
-    const { Uri: writeUri, Method } = writeUriResp.data;
-    if (!writeUri || !Method) throw new Error("Invalid write URI response");
+    const { Uri: writeUri, Verb } = writeUriResp.data;
+    if (!writeUri || !Verb) throw new Error("Invalid write URI response");
 
     // 3. Upload binary to the write URI
     await axios.request({
       url: writeUri,
-      method: Method,
+      method: Verb,
       headers: {
+        "x-ms-blob-type": "BlockBlob", // ✅ Required by Azure Blob
         "Content-Type": contentType,
         "Content-Length": req.file.buffer.length,
       },
@@ -165,7 +167,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
       maxContentLength: Infinity,
     });
 
-    // 4. Get read URI (to allow download/reference)
+    // 4. (Optional) Get read URI for download
     const readUriResp = await axios.get(
       `${ORCH_BASE}/odata/Buckets(${bucketKey})/UiPath.Server.Configuration.OData.GetReadUri`,
       {
@@ -175,7 +177,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
         },
         params: {
           path: fileName,
-          expiryInMinutes: 60, // adjust as needed
+          expiryInMinutes: 60,
         },
       }
     );
@@ -184,7 +186,7 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     if (!readUri) throw new Error("Invalid read URI response");
 
     res.json({
-      message: `File '${fileName}' uploaded to bucket '${bucketName}'`,
+      message: `✅ File '${fileName}' uploaded to bucket '${bucketName}' successfully.`,
       downloadUrl: readUri,
     });
   } catch (err) {
