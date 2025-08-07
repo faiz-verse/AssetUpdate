@@ -147,15 +147,15 @@ app.post("/upload-to-bucket", upload.single("file"), async (req, res) => {
     }
 
     // Resolve bucket key from name
-    const bucketKey = await getBucketKey(bucketName, accessToken);
-    console.log("Got the bucket key: ", bucketKey);
+    // const bucketKey = await getBucketKey(bucketName, accessToken);
+    // console.log("Got the bucket key: ", bucketKey);
 
     // 2. Get signed PUT URI for the file
     const fileName = req.file.originalname;
     const contentType = req.file.mimetype || "application/octet-stream";
 
     const writeUriResp = await axios.get(
-      `${ORCH_BASE}/odata/Buckets(${bucketKey})/UiPath.Server.Configuration.OData.GetWriteUri`,
+      `${ORCH_BASE}/odata/Buckets(2425)/UiPath.Server.Configuration.OData.GetWriteUri`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
